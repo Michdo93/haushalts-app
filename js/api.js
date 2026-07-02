@@ -2,7 +2,7 @@
 //  API Client – Haushalts-App
 //  Setzt BACKEND_URL auf deine Render.com URL!
 // ============================================================
-const BACKEND_URL = 'https://haushalts-backend-XXXX.onrender.com'; // <-- anpassen
+const BACKEND_URL = 'https://haushalts-backend.onrender.com'; // <-- anpassen
 
 const api = {
   _token: () => localStorage.getItem('hh_token'),
