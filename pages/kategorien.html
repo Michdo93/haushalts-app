@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kategorien – HaushaltApp</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<nav class="topnav">
+  <a class="topnav-brand" href="../index.html">💰 HAUSHALTS<em>APP</em></a>
+  <a href="dashboard.html">📊 Dashboard</a>
+  <a href="transaktionen.html">📋 Transaktionen</a>
+  <a href="kategorien.html" class="active">🏷 Kategorien</a>
+  <div id="nav-user"><span></span><button id="btn-logout">Abmelden</button></div>
+</nav>
+<div class="container">
+  <h1 class="page-title">🏷 <em>Kategorien</em></h1>
+  <p class="page-sub">Eigene Kategorien verwalten</p>
+
+  <!-- Neue Kategorie -->
+  <div class="card">
+    <div class="card-title">➕ Neue Kategorie</div>
+    <div id="cat-alert" class="alert alert-red" style="display:none"></div>
+    <div class="row-3">
+      <div class="field"><label>Name</label><input type="text" id="cat-name" placeholder="Kategoriename" maxlength="60"></div>
+      <div class="field"><label>Emoji / Icon</label><input type="text" id="cat-icon" placeholder="🛒" maxlength="4" style="width:80px;font-size:1.3rem;text-align:center"></div>
+      <div class="field"><label>Typ</label>
+        <select id="cat-type">
+          <option value="expense">📤 Ausgabe</option>
+          <option value="income">📥 Einnahme</option>
+        </select>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="btn" onclick="addCat()">Erstellen</button>
+    </div>
+    <div style="margin-top:1rem">
+      <div style="font-size:.75rem;color:var(--muted);margin-bottom:.4rem">Emoji-Vorschläge:</div>
+      <div style="display:flex;flex-wrap:wrap;gap:.3rem">
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)" title="klicken">🏠</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">🛒</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">🚗</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">💊</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">🎮</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">👗</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">🛡</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">⚡</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">📱</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">✈️</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">🎓</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">🏋️</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">🍕</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">☕</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">🎵</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">📺</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">💰</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">💼</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">🎁</span>
+        <span style="font-size:1.2rem;cursor:pointer" onclick="setIcon(this.textContent)">🐾</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ausgaben-Kategorien -->
+  <div class="card">
+    <div class="card-title">📤 Ausgaben-Kategorien</div>
+    <div id="cat-list-exp" class="tx-list"></div>
+  </div>
+
+  <!-- Einnahmen-Kategorien -->
+  <div class="card">
+    <div class="card-title">📥 Einnahmen-Kategorien</div>
+    <div id="cat-list-inc" class="tx-list"></div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script src="../js/nav.js"></script>
+<script>
+requireAuth();
+let cats = [];
+
+async function load() {
+  cats = await api.getCategories();
+  renderLists();
+}
+
+function renderLists() {
+  ['expense','income'].forEach(type => {
+    const el = document.getElementById('cat-list-'+({'expense':'exp','income':'inc'}[type]));
+    const filtered = cats.filter(c=>c.type===type);
+    if (!filtered.length) { el.innerHTML='<div style="color:var(--muted);font-size:.85rem;padding:.5rem 0">Keine Kategorien</div>'; return; }
+    el.innerHTML = filtered.map(c =>
+      `<div class="tx-item">
+        <div class="tx-icon">${c.icon}</div>
+        <div class="tx-info"><div class="tx-desc">${c.name}</div></div>
+        <span class="badge ${type==='income'?'badge-inc':'badge-exp'}">${type==='income'?'Einnahme':'Ausgabe'}</span>
+        <button class="btn-ghost" onclick="deleteCat(${c.id})" title="Löschen">🗑</button>
+      </div>`
+    ).join('');
+  });
+}
+
+function setIcon(emoji) {
+  document.getElementById('cat-icon').value = emoji;
+}
+
+async function addCat() {
+  const name = document.getElementById('cat-name').value.trim();
+  const icon = document.getElementById('cat-icon').value.trim() || '📂';
+  const type = document.getElementById('cat-type').value;
+  const alert = document.getElementById('cat-alert');
+  if (!name) { alert.textContent='Name eingeben'; alert.style.display='block'; return; }
+  alert.style.display='none';
+  try {
+    await api.createCategory({name, icon, type});
+    document.getElementById('cat-name').value='';
+    document.getElementById('cat-icon').value='';
+    await load();
+  } catch(e) { alert.textContent=e.message; alert.style.display='block'; }
+}
+
+async function deleteCat(id) {
+  if (!confirm('Kategorie löschen? Zugehörige Transaktionen verlieren die Kategorie.')) return;
+  try { await api.deleteCategory(id); await load(); }
+  catch(e) { alert('Fehler: '+e.message); }
+}
+
+load();
+</script>
+</body></html>

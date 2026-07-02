@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Haushalts-App – Login</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-box">
+    <div style="text-align:center;font-size:2.5rem;margin-bottom:.5rem">💰</div>
+    <h1 class="auth-title">HAUSHALTS<em style="font-style:normal;color:var(--green)">APP</em></h1>
+    <p class="auth-sub">Einnahmen & Ausgaben im Blick</p>
+
+    <div id="alert" class="alert alert-red" style="display:none"></div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchMode('login')">Anmelden</button>
+      <button class="tab" onclick="switchMode('register')">Registrieren</button>
+    </div>
+
+    <!-- Login -->
+    <div id="mode-login">
+      <div class="field"><label>Benutzername</label><input type="text" id="l-user" placeholder="max_mustermann" autocomplete="username"></div>
+      <div class="field"><label>Passwort</label><input type="password" id="l-pw" placeholder="••••••••" autocomplete="current-password"></div>
+      <button class="btn" style="width:100%;justify-content:center;margin-top:.35rem" id="btn-login" onclick="doLogin()">Anmelden</button>
+    </div>
+
+    <!-- Register -->
+    <div id="mode-register" style="display:none">
+      <div class="field"><label>Benutzername</label><input type="text" id="r-user" placeholder="max_mustermann" autocomplete="username"></div>
+      <div class="field"><label>E-Mail</label><input type="email" id="r-email" placeholder="max@example.com" autocomplete="email"></div>
+      <div class="field"><label>Passwort (min. 6 Zeichen)</label><input type="password" id="r-pw" placeholder="••••••••" autocomplete="new-password"></div>
+      <button class="btn" style="width:100%;justify-content:center;margin-top:.35rem" id="btn-reg" onclick="doRegister()">Konto erstellen</button>
+    </div>
+
+    <p style="font-size:.75rem;color:var(--muted);text-align:center;margin-top:1.25rem">
+      Demo: Daten werden in SQLite auf Render.com gespeichert.<br>Keine persönlichen Daten eingeben.
+    </p>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+// Redirect if already logged in
+if (api._token()) window.location.href = 'pages/dashboard.html';
+
+function switchMode(m) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['login','register'][i] === m));
+  document.getElementById('mode-login').style.display    = m==='login'    ? 'block' : 'none';
+  document.getElementById('mode-register').style.display = m==='register' ? 'block' : 'none';
+  hideAlert();
+}
+
+function showAlert(msg) {
+  const el = document.getElementById('alert');
+  el.textContent = msg; el.style.display = 'block';
+}
+function hideAlert() { document.getElementById('alert').style.display = 'none'; }
+
+async function doLogin() {
+  const btn = document.getElementById('btn-login');
+  const u = document.getElementById('l-user').value.trim();
+  const p = document.getElementById('l-pw').value;
+  if (!u || !p) return showAlert('Benutzername und Passwort eingeben');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Anmelden…';
+  try {
+    await api.login(u, p);
+    window.location.href = 'pages/dashboard.html';
+  } catch(e) {
+    showAlert(e.message);
+    btn.disabled = false; btn.innerHTML = 'Anmelden';
+  }
+}
+
+async function doRegister() {
+  const btn = document.getElementById('btn-reg');
+  const u = document.getElementById('r-user').value.trim();
+  const e = document.getElementById('r-email').value.trim();
+  const p = document.getElementById('r-pw').value;
+  if (!u || !e || !p) return showAlert('Alle Felder ausfüllen');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Erstellen…';
+  try {
+    await api.register(u, e, p);
+    window.location.href = 'pages/dashboard.html';
+  } catch(err) {
+    showAlert(err.message);
+    btn.disabled = false; btn.innerHTML = 'Konto erstellen';
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const mode = document.getElementById('mode-login').style.display !== 'none' ? 'login' : 'register';
+    mode === 'login' ? doLogin() : doRegister();
+  }
+});
+</script>
+</body></html>

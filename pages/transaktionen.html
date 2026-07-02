@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Transaktionen – HaushaltApp</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<nav class="topnav">
+  <a class="topnav-brand" href="../index.html">💰 HAUSHALTS<em>APP</em></a>
+  <a href="dashboard.html">📊 Dashboard</a>
+  <a href="transaktionen.html" class="active">📋 Transaktionen</a>
+  <a href="kategorien.html">🏷 Kategorien</a>
+  <div id="nav-user"><span></span><button id="btn-logout">Abmelden</button></div>
+</nav>
+<div class="container">
+  <h1 class="page-title">📋 <em>Transaktionen</em></h1>
+  <p class="page-sub">Alle Einnahmen und Ausgaben</p>
+
+  <!-- Filter -->
+  <div class="card" style="padding:1rem 1.4rem;margin-bottom:1rem">
+    <div style="display:flex;gap:.75rem;align-items:flex-end;flex-wrap:wrap">
+      <div class="field" style="margin:0">
+        <label style="display:block;margin-bottom:.3rem">Monat</label>
+        <input type="month" id="filter-month" style="width:155px" onchange="load()">
+      </div>
+      <div class="field" style="margin:0">
+        <label style="display:block;margin-bottom:.3rem">Typ</label>
+        <select id="filter-type" style="width:140px" onchange="load()">
+          <option value="">Alle</option>
+          <option value="income">Einnahmen</option>
+          <option value="expense">Ausgaben</option>
+        </select>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="clearFilter()">Filter zurücksetzen</button>
+      <button class="btn btn-sm" onclick="openModal()" style="margin-left:auto">+ Transaktion</button>
+    </div>
+  </div>
+
+  <div id="tx-stats" style="display:flex;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap"></div>
+  <div id="tx-list" class="tx-list"></div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-title">
+      <span id="modal-title-text">+ Transaktion</span>
+      <button class="btn-ghost" onclick="closeModal()" style="font-size:1.2rem">✕</button>
+    </div>
+    <div id="modal-alert" class="alert alert-red" style="display:none"></div>
+    <div class="tabs">
+      <button class="tab active" onclick="setTxType('expense')">📤 Ausgabe</button>
+      <button class="tab" onclick="setTxType('income')">📥 Einnahme</button>
+    </div>
+    <div class="row-2">
+      <div class="field"><label>Betrag (€)</label><input type="number" id="tx-amount" placeholder="0.00" step="0.01" min="0.01"></div>
+      <div class="field"><label>Datum</label><input type="date" id="tx-date"></div>
+    </div>
+    <div class="field"><label>Beschreibung</label><input type="text" id="tx-desc" placeholder="z.B. Wocheneinkauf"></div>
+    <div class="field"><label>Kategorie</label><select id="tx-cat"><option value="">– keine –</option></select></div>
+    <div class="field"><label>Notiz</label><textarea id="tx-note" rows="2"></textarea></div>
+    <div class="btns" style="margin-top:.5rem">
+      <button class="btn" id="btn-save" onclick="saveTx()">Speichern</button>
+      <button class="btn btn-outline" onclick="closeModal()">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/api.js"></script>
+<script src="../js/nav.js"></script>
+<script>
+requireAuth();
+
+const fmtE = n => n.toLocaleString('de-DE',{style:'currency',currency:'EUR'});
+let cats = [], currentType = 'expense', editId = null, allTx = [];
+
+async function init() {
+  const today = new Date().toISOString().slice(0,7);
+  document.getElementById('filter-month').value = today;
+  document.getElementById('tx-date').value = new Date().toISOString().slice(0,10);
+  cats = await api.getCategories();
+  await load();
+}
+
+async function load() {
+  const m = document.getElementById('filter-month').value;
+  const t = document.getElementById('filter-type').value;
+  allTx = await api.getTransactions({month:m||undefined, type:t||undefined});
+  renderStats();
+  renderList();
+}
+
+function renderStats() {
+  let inc=0,exp=0;
+  allTx.forEach(t=>t.type==='income'?inc+=t.amount:exp+=t.amount);
+  document.getElementById('tx-stats').innerHTML = `
+    <div class="stat-card" style="padding:.75rem 1rem;flex:1;min-width:140px"><div class="stat-label">Einnahmen</div><div class="stat-val amount-inc" style="font-size:1.2rem">${fmtE(inc)}</div></div>
+    <div class="stat-card" style="padding:.75rem 1rem;flex:1;min-width:140px"><div class="stat-label">Ausgaben</div><div class="stat-val amount-exp" style="font-size:1.2rem">${fmtE(exp)}</div></div>
+    <div class="stat-card" style="padding:.75rem 1rem;flex:1;min-width:140px"><div class="stat-label">Saldo</div><div class="stat-val ${inc-exp>=0?'amount-inc':'amount-exp'}" style="font-size:1.2rem">${fmtE(inc-exp)}</div></div>
+    <div class="stat-card" style="padding:.75rem 1rem;flex:0"><div class="stat-label">Einträge</div><div class="stat-val" style="font-size:1.2rem">${allTx.length}</div></div>`;
+}
+
+function renderList() {
+  const el = document.getElementById('tx-list');
+  if (!allTx.length) { el.innerHTML='<div class="empty"><div class="icon">📭</div>Keine Transaktionen gefunden</div>'; return; }
+  el.innerHTML = allTx.map(t => {
+    const icon  = t.category ? t.category.icon : (t.type==='income'?'💰':'📦');
+    const cat   = t.category ? t.category.name : '–';
+    const sign  = t.type==='income' ? '+' : '−';
+    const cls   = t.type==='income' ? 'amount-inc' : 'amount-exp';
+    const note  = t.note ? `<span title="${t.note}">📝</span>` : '';
+    return `<div class="tx-item">
+      <div class="tx-icon">${icon}</div>
+      <div class="tx-info">
+        <div class="tx-desc">${t.description||'–'}</div>
+        <div class="tx-meta">
+          <span>${t.date}</span>
+          <span class="badge ${t.type==='income'?'badge-inc':'badge-exp'}">${cat}</span>
+          ${note}
+        </div>
+      </div>
+      <div class="tx-amount ${cls}">${sign}${fmtE(t.amount)}</div>
+      <div style="display:flex;gap:.2rem;flex-shrink:0">
+        <button class="btn-ghost" title="Bearbeiten" onclick="editTx(${t.id})">✏️</button>
+        <button class="btn-ghost" title="Löschen" onclick="deleteTx(${t.id})">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function clearFilter() {
+  document.getElementById('filter-month').value = new Date().toISOString().slice(0,7);
+  document.getElementById('filter-type').value = '';
+  load();
+}
+
+// Modal
+function setTxType(t) {
+  currentType = t;
+  document.querySelectorAll('#modal .tab').forEach((el,i)=>el.classList.toggle('active',['expense','income'][i]===t));
+  const filtered = cats.filter(c=>c.type===t);
+  document.getElementById('tx-cat').innerHTML = '<option value="">– keine –</option>' +
+    filtered.map(c=>`<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
+}
+
+function openModal() {
+  editId=null;
+  document.getElementById('modal-title-text').textContent='+ Neue Transaktion';
+  document.getElementById('tx-amount').value='';
+  document.getElementById('tx-desc').value='';
+  document.getElementById('tx-note').value='';
+  document.getElementById('tx-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('modal-alert').style.display='none';
+  setTxType('expense');
+  document.getElementById('modal').style.display='flex';
+}
+
+function editTx(id) {
+  const t = allTx.find(x=>x.id===id);
+  if (!t) return;
+  editId = id;
+  document.getElementById('modal-title-text').textContent='✏️ Bearbeiten';
+  document.getElementById('tx-amount').value=t.amount;
+  document.getElementById('tx-desc').value=t.description;
+  document.getElementById('tx-note').value=t.note||'';
+  document.getElementById('tx-date').value=t.date;
+  document.getElementById('modal-alert').style.display='none';
+  setTxType(t.type);
+  if (t.category_id) document.getElementById('tx-cat').value=t.category_id;
+  document.getElementById('modal').style.display='flex';
+}
+
+function closeModal() { document.getElementById('modal').style.display='none'; }
+
+async function saveTx() {
+  const btn=document.getElementById('btn-save'), malert=document.getElementById('modal-alert');
+  const amount=parseFloat(document.getElementById('tx-amount').value);
+  const desc=document.getElementById('tx-desc').value.trim();
+  const date=document.getElementById('tx-date').value;
+  const cat_id=parseInt(document.getElementById('tx-cat').value)||null;
+  const note=document.getElementById('tx-note').value.trim();
+  if (!amount||!date){malert.textContent='Betrag und Datum angeben';malert.style.display='block';return;}
+  malert.style.display='none';
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  try {
+    const data={amount,type:currentType,description:desc,note,date,category_id:cat_id};
+    if(editId) await api.updateTransaction(editId,data);
+    else       await api.createTransaction(data);
+    closeModal(); await load();
+  } catch(e){malert.textContent=e.message;malert.style.display='block';}
+  finally{btn.disabled=false;btn.innerHTML='Speichern';}
+}
+
+async function deleteTx(id) {
+  if (!confirm('Transaktion löschen?')) return;
+  await api.deleteTransaction(id);
+  await load();
+}
+
+init();
+</script>
+</body></html>
